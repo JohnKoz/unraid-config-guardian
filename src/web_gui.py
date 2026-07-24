@@ -127,9 +127,7 @@ async def dashboard(request: Request):
     except Exception as e:
         stats = {"error": str(e), "status": background_status}
 
-    return templates.TemplateResponse(
-        "dashboard.html", {"request": request, "stats": stats}
-    )
+    return templates.TemplateResponse(request, "dashboard.html", {"stats": stats})
 
 
 @app.get("/containers", response_class=HTMLResponse)
@@ -140,13 +138,12 @@ async def containers_page(request: Request):
         system_info = get_system_info_safe()
         stats = {"system_info": system_info}
         return templates.TemplateResponse(
+            request,
             "containers.html",
-            {"request": request, "containers": containers, "stats": stats},
+            {"containers": containers, "stats": stats},
         )
     except Exception as e:
-        return templates.TemplateResponse(
-            "error.html", {"request": request, "error": str(e)}
-        )
+        return templates.TemplateResponse(request, "error.html", {"error": str(e)})
 
 
 @app.get("/api/containers")
@@ -213,7 +210,7 @@ async def list_backups(request: Request):
     stats = {"system_info": system_info}
 
     return templates.TemplateResponse(
-        "backups.html", {"request": request, "backups": backups, "stats": stats}
+        request, "backups.html", {"backups": backups, "stats": stats}
     )
 
 
@@ -399,7 +396,7 @@ This is a development/demo backup.
         }
 
         for filename, content in files.items():
-            (output_path / filename).write_text(content)
+            (output_path / filename).write_text(content, encoding="utf-8")
 
         # Make restore script executable
         os.chmod(output_path / "restore.sh", 0o755)
