@@ -1,9 +1,14 @@
 name: Publish Fork Image
 
-# Manual-only workflow for building/publishing this fork's own images to
-# a personal Docker Hub account, independent of the upstream ci-cd.yml
-# pipeline (which is hardcoded to stephondoestech/unraid-config-guardian).
+# Builds/publishes this fork's own images to a personal Docker Hub
+# account, independent of the upstream ci-cd.yml pipeline (which is
+# hardcoded to stephondoestech/unraid-config-guardian). Runs
+# automatically on every push to main (tagged "latest"), or manually
+# via workflow_dispatch for any other branch/tag.
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       ref:
@@ -23,7 +28,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref }}
+          ref: ${{ github.event.inputs.ref || github.sha }}
+
+      - name: Determine tag
+        id: vars
+        run: echo "tag=${{ github.event.inputs.tag || 'latest' }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -39,6 +48,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/unraid-config-guardian:${{ github.event.inputs.tag }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/unraid-config-guardian:${{ steps.vars.outputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
