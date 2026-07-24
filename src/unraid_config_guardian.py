@@ -133,10 +133,19 @@ def get_containers():
                 if "=" in env_var:
                     key, value = env_var.split("=", 1)
                     # Simple masking for common sensitive keys
-                    if any(
-                        word in key.lower()
-                        for word in ["password", "key", "token", "secret"]
-                    ):
+                    # Added vpn_pass/vpn_user/socks_user/socks_pass for
+                    # binhex-qbittorrentvpn
+                    sensitive_words = [
+                        "password",
+                        "key",
+                        "token",
+                        "secret",
+                        "vpn_pass",
+                        "vpn_user",
+                        "socks_user",
+                        "socks_pass",
+                    ]
+                    if any(word in key.lower() for word in sensitive_words):
                         value = "***MASKED***"
                     info["environment"][key] = value
         except (KeyError, AttributeError) as e:

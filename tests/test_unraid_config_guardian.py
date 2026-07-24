@@ -50,6 +50,53 @@ def test_get_containers():
         assert container["environment"]["SECRET_PASSWORD"] == "***MASKED***"
 
 
+def test_get_containers_masks_sensitive_env_vars():
+    """Test that each sensitive keyword triggers masking of its env var value."""
+    with patch("docker.from_env") as mock_docker:
+        mock_container = Mock()
+        mock_container.name = "test-container"
+        mock_container.image.tags = ["nginx:latest"]
+        mock_container.status = "running"
+        mock_container.attrs = {
+            "NetworkSettings": {},
+            "Mounts": [],
+            "Config": {
+                "Env": [
+                    "DB_PASSWORD=hunter2",
+                    "API_KEY=abc123",
+                    "AUTH_TOKEN=xyz789",
+                    "APP_SECRET=shh",
+                    "VPN_PASS=vpnpass123",
+                    "VPN_USER=vpnuser123",
+                    "SOCKS_USER=socksuser123",
+                    "SOCKS_PASS=sockspass123",
+                    "TEST_VAR=not_sensitive",
+                ]
+            },
+        }
+
+        mock_client = Mock()
+        mock_client.containers.list.return_value = [mock_container]
+        mock_docker.return_value = mock_client
+
+        containers = guardian.get_containers()
+
+        assert len(containers) == 1
+        env = containers[0]["environment"]
+
+        assert env["DB_PASSWORD"] == "***MASKED***"
+        assert env["API_KEY"] == "***MASKED***"
+        assert env["AUTH_TOKEN"] == "***MASKED***"
+        assert env["APP_SECRET"] == "***MASKED***"
+        assert env["VPN_PASS"] == "***MASKED***"
+        assert env["VPN_USER"] == "***MASKED***"
+        assert env["SOCKS_USER"] == "***MASKED***"
+        assert env["SOCKS_PASS"] == "***MASKED***"
+
+        # Sanity check: non-sensitive vars pass through unmasked
+        assert env["TEST_VAR"] == "not_sensitive"
+
+
 def test_generate_compose():
     """Test docker-compose generation."""
     containers = [
