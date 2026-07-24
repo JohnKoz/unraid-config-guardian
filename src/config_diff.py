@@ -309,7 +309,7 @@ baseline.
 Future change logs will appear here when configurations are modified.
 """
         try:
-            changes_file.write_text(first_backup_log)
+            changes_file.write_text(first_backup_log, encoding="utf-8")
             logger.info("✅ Initial change log created: changes.log")
             logger.info(f"Change log written to: {changes_file}")
         except Exception as e:
@@ -323,7 +323,7 @@ Future change logs will appear here when configurations are modified.
 
     # Write change log file
     try:
-        changes_file.write_text(change_log)
+        changes_file.write_text(change_log, encoding="utf-8")
         logger.info("✅ Change log created: changes.log")
         logger.info(f"Change log written to: {changes_file}")
     except Exception as e:

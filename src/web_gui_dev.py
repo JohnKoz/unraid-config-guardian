@@ -113,9 +113,7 @@ async def dashboard(request: Request):
     except Exception as e:
         stats = {"error": str(e), "status": background_status}
 
-    return templates.TemplateResponse(
-        "dashboard.html", {"request": request, "stats": stats}
-    )
+    return templates.TemplateResponse(request, "dashboard.html", {"stats": stats})
 
 
 @app.get("/containers", response_class=HTMLResponse)
@@ -125,13 +123,12 @@ async def containers_page(request: Request):
         containers = get_containers_safe()
         stats = {"system_info": MOCK_SYSTEM_INFO}
         return templates.TemplateResponse(
+            request,
             "containers.html",
-            {"request": request, "containers": containers, "stats": stats},
+            {"containers": containers, "stats": stats},
         )
     except Exception as e:
-        return templates.TemplateResponse(
-            "error.html", {"request": request, "error": str(e)}
-        )
+        return templates.TemplateResponse(request, "error.html", {"error": str(e)})
 
 
 @app.get("/api/containers")
@@ -197,7 +194,7 @@ async def list_backups(request: Request):
     stats = {"system_info": MOCK_SYSTEM_INFO}
 
     return templates.TemplateResponse(
-        "backups.html", {"request": request, "backups": backups, "stats": stats}
+        request, "backups.html", {"backups": backups, "stats": stats}
     )
 
 
@@ -428,7 +425,7 @@ Keep this documentation safe and test your restore process!
         }
 
         for filename, content in files.items():
-            (output_path / filename).write_text(content)
+            (output_path / filename).write_text(content, encoding="utf-8")
 
         # Create a mock container-templates.zip with sample XML templates
         template_zip_path = output_path / "container-templates.zip"
