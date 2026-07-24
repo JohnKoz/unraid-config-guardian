@@ -72,25 +72,47 @@ background_status = {
 }
 
 
+# Tracks the most recent reason Docker was unreachable for each call, so
+# the UI can surface a visible warning instead of silently showing
+# mock/demo data as if it were real. Kept separate per call (rather than
+# one shared variable) so a successful call doesn't mask a failure from
+# the other. Use docker_connection_error() to read the combined status.
+_containers_error = None
+_system_info_error = None
+
+
+def docker_connection_error():
+    """Return the most recent Docker error, if any, from either safe getter."""
+    return _containers_error or _system_info_error
+
+
 def get_containers_safe():
     """Get containers with fallback to mock data."""
+    global _containers_error
     try:
         # Try to import and use real Docker client
         from unraid_config_guardian import get_containers
 
-        return get_containers()
+        containers = get_containers()
+        _containers_error = None
+        return containers
     except Exception as e:
+        _containers_error = str(e)
         print(f"Docker not available, using mock data: {e}")
         return MOCK_CONTAINERS
 
 
 def get_system_info_safe():
     """Get system info with fallback to mock data."""
+    global _system_info_error
     try:
         from unraid_config_guardian import get_system_info
 
-        return get_system_info()
-    except Exception:
+        info = get_system_info()
+        _system_info_error = None
+        return info
+    except Exception as e:
+        _system_info_error = str(e)
         return MOCK_SYSTEM_INFO
 
 
@@ -109,6 +131,7 @@ async def dashboard(request: Request):
             "system_info": system_info,
             "last_backup": get_last_backup_info(),
             "status": background_status,
+            "docker_connection_error": docker_connection_error(),
         }
     except Exception as e:
         stats = {"error": str(e), "status": background_status}
@@ -121,7 +144,10 @@ async def containers_page(request: Request):
     """Containers overview page."""
     try:
         containers = get_containers_safe()
-        stats = {"system_info": MOCK_SYSTEM_INFO}
+        stats = {
+            "system_info": MOCK_SYSTEM_INFO,
+            "docker_connection_error": docker_connection_error(),
+        }
         return templates.TemplateResponse(
             request,
             "containers.html",
