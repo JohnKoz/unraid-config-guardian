@@ -97,6 +97,36 @@ def test_get_containers_masks_sensitive_env_vars():
         assert env["TEST_VAR"] == "not_sensitive"
 
 
+def test_mask_template_xml(tmp_path):
+    """Test that sensitive Config values in Unraid template XML are masked."""
+    import xml.etree.ElementTree as ET
+
+    xml_content = """<?xml version="1.0"?>
+<Container version="2">
+  <Name>binhex-qbittorrentvpn</Name>
+  <Config Name="VPN_USER" Target="VPN_USER" Type="Variable">myvpnuser</Config>
+  <Config Name="VPN_PASS" Target="VPN_PASS" Type="Variable">myvpnpass</Config>
+  <Config Name="SOCKS_USER" Target="SOCKS_USER" Type="Variable">mysocksuser</Config>
+  <Config Name="SOCKS_PASS" Target="SOCKS_PASS" Type="Variable">mysockspass</Config>
+  <Config Name="WebUI Port" Target="8080" Type="Port">8080</Config>
+</Container>
+"""
+    template_path = tmp_path / "binhex-qbittorrentvpn.xml"
+    template_path.write_text(xml_content, encoding="utf-8")
+
+    masked_xml = guardian.mask_template_xml(template_path)
+    root = ET.fromstring(masked_xml)
+    configs = {c.get("Name"): c.text for c in root.findall("Config")}
+
+    assert configs["VPN_USER"] == "***MASKED***"
+    assert configs["VPN_PASS"] == "***MASKED***"
+    assert configs["SOCKS_USER"] == "***MASKED***"
+    assert configs["SOCKS_PASS"] == "***MASKED***"
+
+    # Sanity check: non-sensitive config passes through unmasked
+    assert configs["WebUI Port"] == "8080"
+
+
 def test_generate_compose():
     """Test docker-compose generation."""
     containers = [
