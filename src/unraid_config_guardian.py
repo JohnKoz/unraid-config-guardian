@@ -697,7 +697,7 @@ def main():
 
         for filename, content in files.items():
             file_path = output_dir / filename
-            file_path.write_text(content)
+            file_path.write_text(content, encoding="utf-8")
             logger.info(f"✅ Created {filename}")
 
         # Make restore script executable
