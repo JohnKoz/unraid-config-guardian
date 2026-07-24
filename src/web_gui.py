@@ -106,7 +106,12 @@ def get_containers_safe():
         _containers_error = "Docker integration failed to load at startup."
         return MOCK_CONTAINERS
     try:
-        containers = get_containers()
+        mask_passwords = os.getenv("MASK_PASSWORDS", "true").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
+        containers = get_containers(mask_passwords=mask_passwords)
         _containers_error = None
         return containers
     except Exception as e:
@@ -513,9 +518,11 @@ def main():
     """Run the web server."""
     port = int(os.getenv("WEB_PORT", 7842))
     host = os.getenv("WEB_HOST", "0.0.0.0")
+    mask_passwords = os.getenv("MASK_PASSWORDS", "true").lower() in ("true", "1", "yes")
 
     print(f"🌐 Starting Unraid Config Guardian Web GUI on http://{host}:{port}")
     print("🔗 Access via: http://your-unraid-ip:7842")
+    print(f"🔒 MASK_PASSWORDS={'true' if mask_passwords else 'false'}")
 
     uvicorn.run("web_gui:app", host=host, port=port, reload=False, access_log=True)
 

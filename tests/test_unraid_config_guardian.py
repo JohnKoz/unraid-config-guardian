@@ -97,6 +97,38 @@ def test_get_containers_masks_sensitive_env_vars():
         assert env["TEST_VAR"] == "not_sensitive"
 
 
+def test_get_containers_no_mask():
+    """Test container information extraction without password masking."""
+    with patch("docker.from_env") as mock_docker:
+        # Mock container
+        mock_container = Mock()
+        mock_container.name = "test-container"
+        mock_container.image.tags = ["nginx:latest"]
+        mock_container.status = "running"
+        mock_container.attrs = {
+            "NetworkSettings": {"Ports": {"80/tcp": [{"HostPort": "8080"}]}},
+            "Mounts": [
+                {
+                    "Type": "bind",
+                    "Source": "/host/path",
+                    "Destination": "/container/path",
+                }
+            ],
+            "Config": {"Env": ["TEST_VAR=test_value", "SECRET_PASSWORD=hidden"]},
+        }
+
+        mock_client = Mock()
+        mock_client.containers.list.return_value = [mock_container]
+        mock_docker.return_value = mock_client
+
+        containers = guardian.get_containers(mask_passwords=False)
+
+        assert len(containers) == 1
+        container = containers[0]
+        assert container["environment"]["SECRET_PASSWORD"] == "hidden"
+        assert container["environment"]["TEST_VAR"] == "test_value"
+
+
 def test_mask_template_xml(tmp_path):
     """Test that sensitive Config values in Unraid template XML are masked."""
     import xml.etree.ElementTree as ET
