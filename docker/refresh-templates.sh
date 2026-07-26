@@ -24,10 +24,13 @@ if [ "$(ls -A "$TEMPLATES_SOURCE"/*.xml 2>/dev/null)" ]; then
     template_count=$(ls -1 "$TEMPLATES_CACHE"/*.xml 2>/dev/null | wc -l)
     echo "✅ Refreshed $template_count XML templates"
 
-    # Ensure proper ownership for the user who will read them
-    if [ -n "$PUID" ] && [ -n "$PGID" ]; then
-        chown -R "$PUID:$PGID" "$TEMPLATES_CACHE" 2>/dev/null || true
-    fi
+    # Ensure proper ownership for the user who will read them.
+    # This script usually runs via sudo, which strips PUID/PGID from the
+    # environment by default even though the sudoers rule allows it to
+    # run - so match ownership to /output itself (already chowned to the
+    # app's PUID:PGID user by entrypoint.sh) instead of depending on
+    # those env vars surviving sudo.
+    chown -R --reference="/output" "$TEMPLATES_CACHE" 2>/dev/null || true
 else
     echo "ℹ️ No XML templates found to refresh"
 fi
