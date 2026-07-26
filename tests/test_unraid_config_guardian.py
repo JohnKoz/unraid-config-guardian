@@ -3,6 +3,7 @@
 Simple tests for Unraid Config Guardian
 """
 
+import shutil
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -157,6 +158,52 @@ def test_mask_template_xml(tmp_path):
 
     # Sanity check: non-sensitive config passes through unmasked
     assert configs["WebUI Port"] == "8080"
+
+
+def test_create_templates_zip_cleans_up_cached_templates(tmp_path):
+    """Test that cached-templates/ is actually deleted after a successful zip build.
+
+    Regression test: cleanup was previously gated behind a check that the
+    unprivileged app process could read /boot/config/... directly, which
+    is never true in production (that's why refresh-templates.sh needs
+    sudo), so cleanup never actually ran despite the code being present.
+    """
+    xml_content = """<?xml version="1.0"?>
+<Container version="2">
+  <Name>test</Name>
+  <Config Name="VPN_PASS" Target="VPN_PASS" Type="Variable">realsecret</Config>
+</Container>
+"""
+    template_path = tmp_path / "test.xml"
+    template_path.write_text(xml_content, encoding="utf-8")
+
+    templates = [
+        {
+            "name": "test.xml",
+            "path": str(template_path),
+            "size": template_path.stat().st_size,
+        }
+    ]
+
+    # create_templates_zip's cleanup step hardcodes /output/cached-templates
+    # regardless of the output_dir argument, so the test has to manage that
+    # fixed path directly rather than through tmp_path.
+    real_cached_dir = Path("/output/cached-templates")
+    real_cached_dir.mkdir(parents=True, exist_ok=True)
+    (real_cached_dir / "leftover.xml").write_text(
+        "<Container></Container>", encoding="utf-8"
+    )
+
+    try:
+        zip_path = guardian.create_templates_zip(templates, tmp_path)
+        assert zip_path is not None
+        assert not real_cached_dir.exists(), (
+            "cached-templates directory should be deleted after a "
+            "successful zip build, but it still exists"
+        )
+    finally:
+        if real_cached_dir.exists():
+            shutil.rmtree(real_cached_dir)
 
 
 def test_generate_compose():
