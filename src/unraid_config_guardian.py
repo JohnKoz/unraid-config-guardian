@@ -10,6 +10,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
@@ -480,37 +481,22 @@ def create_templates_zip(templates, output_dir):
                 f"Created templates zip: {zip_path} with {templates_added} templates"
             )
 
-            # Clean up cached templates after successful zip creation
-            # Only remove cached templates if we can access the direct boot config path
+            # Clean up cached templates after successful zip creation. We've
+            # already read everything needed from cached_dir to build the
+            # zip above, so cleanup doesn't need to re-verify boot config
+            # accessibility first. That re-check was gating cleanup on
+            # whether the unprivileged app process could read
+            # /boot/config/... directly - which it generally can't (that's
+            # the whole reason refresh-templates.sh needs sudo), so the
+            # condition was effectively always false and cleanup never ran.
             try:
                 cached_dir = Path("/output/cached-templates")
-                boot_templates_dir = Path(
-                    "/boot/config/plugins/dockerMan/templates-user"
-                )
-
                 if cached_dir.exists():
-                    # Test if we can access the boot config directory before cleaning up cache
-                    try:
-                        if boot_templates_dir.exists() and list(
-                            boot_templates_dir.glob("*.xml")
-                        ):
-                            import shutil
-
-                            shutil.rmtree(cached_dir)
-                            logging.info(
-                                "Cleaned up cached templates directory - boot config accessible"
-                            )
-                        else:
-                            logging.info(
-                                "Keeping cached templates - boot config not accessible"
-                            )
-                    except (PermissionError, OSError):
-                        logging.info(
-                            "Keeping cached templates - no permission to access boot config"
-                        )
+                    shutil.rmtree(cached_dir)
+                    logging.info("Cleaned up cached templates directory")
                 else:
                     logging.info("No cached templates directory to clean up")
-            except Exception as cleanup_error:
+            except (PermissionError, OSError) as cleanup_error:
                 logging.warning(f"Could not clean up cached templates: {cleanup_error}")
 
             return zip_path
