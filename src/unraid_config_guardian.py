@@ -339,6 +339,8 @@ def get_container_templates():
                         2>/dev/null)" ]; then
                         cp /boot/config/plugins/dockerMan/templates-user/*.xml \\
                             /output/cached-templates/ 2>/dev/null || true
+                        chown -R --reference="/output" /output/cached-templates \\
+                            2>/dev/null || true
                         template_count=$(ls -1 /output/cached-templates/*.xml 2>/dev/null | wc -l)
                         echo "Cached $template_count XML templates"
                     else
