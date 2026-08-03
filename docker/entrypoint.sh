@@ -60,8 +60,12 @@ if [ "$(id -u)" = "0" ] && [ -n "$PUID" ] && [ -n "$PGID" ]; then
     groupmod -o -g "$PGID" guardian 2>/dev/null || true
     usermod -o -u "$PUID" guardian 2>/dev/null || true
 
-    # Update sudo rule for template refresh to work with any UID
-    echo "%$PGID ALL=(root) NOPASSWD: /usr/local/bin/refresh-templates.sh" > /etc/sudoers.d/guardian-templates
+    # Update sudo rule for template refresh to work with any UID.
+    # `%#GID` is the sudoers syntax for "group with numeric GID"; a bare
+    # `%GID` would be interpreted as a group *named* that number, which
+    # never matches, silently disabling the NOPASSWD rule and causing
+    # sudo to demand an unavailable password on every call.
+    echo "%#$PGID ALL=(root) NOPASSWD: /usr/local/bin/refresh-templates.sh" > /etc/sudoers.d/guardian-templates
     chmod 440 /etc/sudoers.d/guardian-templates
 
     # Ensure proper ownership of key directories
