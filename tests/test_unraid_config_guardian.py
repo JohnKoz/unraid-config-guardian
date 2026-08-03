@@ -3,7 +3,6 @@
 Simple tests for Unraid Config Guardian
 """
 
-import shutil
 import sys
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -185,25 +184,18 @@ def test_create_templates_zip_cleans_up_cached_templates(tmp_path):
         }
     ]
 
-    # create_templates_zip's cleanup step hardcodes /output/cached-templates
-    # regardless of the output_dir argument, so the test has to manage that
-    # fixed path directly rather than through tmp_path.
-    real_cached_dir = Path("/output/cached-templates")
-    real_cached_dir.mkdir(parents=True, exist_ok=True)
-    (real_cached_dir / "leftover.xml").write_text(
+    cached_dir = tmp_path / "cached-templates"
+    cached_dir.mkdir(parents=True, exist_ok=True)
+    (cached_dir / "leftover.xml").write_text(
         "<Container></Container>", encoding="utf-8"
     )
 
-    try:
-        zip_path = guardian.create_templates_zip(templates, tmp_path)
-        assert zip_path is not None
-        assert not real_cached_dir.exists(), (
-            "cached-templates directory should be deleted after a "
-            "successful zip build, but it still exists"
-        )
-    finally:
-        if real_cached_dir.exists():
-            shutil.rmtree(real_cached_dir)
+    zip_path = guardian.create_templates_zip(templates, tmp_path)
+    assert zip_path is not None
+    assert not cached_dir.exists(), (
+        "cached-templates directory should be deleted after a "
+        "successful zip build, but it still exists"
+    )
 
 
 def test_generate_compose():

@@ -490,7 +490,7 @@ def create_templates_zip(templates, output_dir):
             # the whole reason refresh-templates.sh needs sudo), so the
             # condition was effectively always false and cleanup never ran.
             try:
-                cached_dir = Path("/output/cached-templates")
+                cached_dir = output_dir / "cached-templates"
                 if cached_dir.exists():
                     shutil.rmtree(cached_dir)
                     logging.info("Cleaned up cached templates directory")
