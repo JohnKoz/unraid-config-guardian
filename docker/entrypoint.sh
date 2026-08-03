@@ -125,19 +125,35 @@ if [ -n "$SCHEDULE" ]; then
         echo "Cron Docker env: none provided (falling back to container defaults)"
     fi
 
-    CRON_CMD="cd /app &&"
-    if [ -n "$CRON_ENV_VARS" ]; then
-        CRON_CMD="$CRON_CMD $CRON_ENV_VARS"
-    fi
-    CRON_CMD="$CRON_CMD $PYTHON_BIN src/unraid_config_guardian.py --output /output >> /output/guardian.log 2>&1"
-
     if [ "$(id -u)" = "0" ]; then
-        # Running as root, use crontab for guardian user
-        echo "$SCHEDULE $CRON_CMD" | crontab -u guardian - 2>/dev/null || true
+        # Running as root: refresh the template cache directly as part of
+        # this same root cron job (no sudo needed - this container already
+        # has root here), then drop to the guardian user for the actual
+        # backup. Previously the refresh only ran once at container start
+        # (above) and every cron-triggered run relied on guardian's sudo
+        # access to refresh-templates.sh, which was silently failing every
+        # time (sudo demanding a password despite the NOPASSWD rule) - the
+        # backup was only ever working off whatever templates existed at
+        # the last container start, potentially stale for the container's
+        # entire uptime. See docs/services/unraid-config-guardian.md.
+        CRON_CMD="cd /app && /usr/local/bin/refresh-templates.sh >> /output/guardian.log 2>&1 &&"
+        if [ -n "$CRON_ENV_VARS" ]; then
+            CRON_CMD="$CRON_CMD $CRON_ENV_VARS"
+        fi
+        CRON_CMD="$CRON_CMD gosu guardian $PYTHON_BIN src/unraid_config_guardian.py --output /output >> /output/guardian.log 2>&1"
+        echo "$SCHEDULE $CRON_CMD" | crontab - 2>/dev/null || true
         # Start cron in background
         cron & 2>/dev/null || true
     else
-        # Running as non-root, use user crontab
+        # Running as non-root: can't refresh templates directly either
+        # (same permission boundary), so just run the backup - the direct
+        # access fallback in get_container_templates() already handles a
+        # read failure gracefully.
+        CRON_CMD="cd /app &&"
+        if [ -n "$CRON_ENV_VARS" ]; then
+            CRON_CMD="$CRON_CMD $CRON_ENV_VARS"
+        fi
+        CRON_CMD="$CRON_CMD $PYTHON_BIN src/unraid_config_guardian.py --output /output >> /output/guardian.log 2>&1"
         echo "$SCHEDULE $CRON_CMD" | crontab - 2>/dev/null || true
     fi
 fi
