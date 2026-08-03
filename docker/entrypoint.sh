@@ -35,27 +35,6 @@ if [ -z "$CACHED_UNRAID_VERSION" ] && [ -f "/boot/config/docker.cfg" ]; then
     fi
 fi
 
-# Cache template directory accessibility and copy templates
-if [ -d "/boot/config/plugins/dockerMan/templates-user" ]; then
-    export TEMPLATES_ACCESSIBLE="true"
-    echo "Template directory accessible"
-
-    # Create cache directory for templates in /output (persistent location)
-    mkdir -p /output/cached-templates
-
-    # Copy all XML templates to cache directory (as root, so we can read them)
-    if [ "$(ls -A /boot/config/plugins/dockerMan/templates-user/*.xml 2>/dev/null)" ]; then
-        cp /boot/config/plugins/dockerMan/templates-user/*.xml /output/cached-templates/ 2>/dev/null || true
-        template_count=$(ls -1 /output/cached-templates/*.xml 2>/dev/null | wc -l)
-        echo "Cached $template_count XML templates to /output/cached-templates"
-    else
-        echo "No XML templates found in templates-user directory"
-    fi
-else
-    export TEMPLATES_ACCESSIBLE="false"
-    echo "Template directory not accessible"
-fi
-
 # Handle PUID/PGID for Unraid compatibility (only if running as root)
 # If PUID/PGID are missing, proactively fail with guidance when mounts aren’t writable.
 check_writable_or_fail() {
@@ -179,6 +158,26 @@ EOF
     if [ "$(id -u)" = "0" ]; then
         chown guardian:guardian /config/config.yml 2>/dev/null || true
     fi
+fi
+
+# Run one full backup cycle immediately at container start, so output is
+# never stale between restarts. This used to just cache templates here
+# (root, so it could read the protected boot config) with no matching
+# cleanup - cached-templates/ would sit there holding raw, unmasked
+# credentials until the next scheduled cron run happened to consume and
+# clean it up, which could be up to a full SCHEDULE interval later (e.g.
+# a container restart right after a daily 02:00 run wouldn't get cleaned
+# up until the following day). This runs the exact same
+# refresh-then-generate-then-cleanup sequence the cron job uses (see
+# below), just once immediately instead of waiting for the first tick.
+echo "Running an initial backup..."
+cd /app
+INITIAL_PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
+if [ "$(id -u)" = "0" ]; then
+    /usr/local/bin/refresh-templates.sh >> /output/guardian.log 2>&1 || true
+    gosu guardian "$INITIAL_PYTHON_BIN" src/unraid_config_guardian.py --output /output >> /output/guardian.log 2>&1 || true
+else
+    "$INITIAL_PYTHON_BIN" src/unraid_config_guardian.py --output /output >> /output/guardian.log 2>&1 || true
 fi
 
 # Switch to guardian user and execute command
