@@ -160,6 +160,14 @@ EOF
     fi
 fi
 
+# Bridge guardian.log into the container's stdout so scheduled backup
+# runs (which write to a file, not PID 1's stdout) show up in
+# `docker logs` and Unraid's Docker-tab log viewer. Prefix each line
+# with [guardian.log] to distinguish from the web UI's own output.
+# Started before the initial backup below so its output also streams.
+touch /output/guardian.log 2>/dev/null || true
+tail -n 0 -F /output/guardian.log 2>/dev/null | sed -u 's/^/[guardian.log] /' &
+
 # Run one full backup cycle immediately at container start, so output is
 # never stale between restarts. This used to just cache templates here
 # (root, so it could read the protected boot config) with no matching
