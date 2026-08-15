@@ -63,5 +63,4 @@ docker-compose.override.yml
 # But allow example files
 !*.example
 !*.template
-CLAUDE.md
 AGENTS.md
